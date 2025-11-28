@@ -1,0 +1,143 @@
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>SSE Client Example</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .message { padding: 10px; margin: 5px 0; border-left: 3px solid #ccc; }
+        .broadcast { border-color: #4CAF50; background-color: #E8F5E9; } /* 广播消息：绿色边框 */
+        .progress { border-color: #2196F3; background-color: #E3F2FD; }   /* 进度消息：蓝色边框 */
+        .complete { border-color: #FF9800; background-color: #FFF3E0; }   /* 完成消息：橙色边框 */
+        .error { border-color: #F44336; background-color: #FFEBEE; }       /* 错误消息：红色边框 */
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Server-Sent Events (SSE) Client</h1>
+        
+        <!-- 操作按钮区 -->
+        <div>
+            <button onclick="connectSSE()">Connect to SSE</button>    <!-- 建立SSE连接 -->
+            <button onclick="disconnectSSE()">Disconnect</button>     <!-- 断开连接 -->
+            <button onclick="broadcastMessage()">Send Broadcast</button> <!-- 发送广播 -->
+            <button onclick="startTask()">Start Task</button>         <!-- 启动模拟任务 -->
+        </div>
+        
+        <!-- 消息展示区 -->
+        <div>
+            <h2>Messages:</h2>
+            <div id="messages"></div> <!-- 动态显示服务器推送的消息 -->
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null; // 用于存储SSE连接实例（全局变量）
+        
+        /**
+         * 建立SSE连接
+         */
+        function connectSSE() {
+            // 避免重复连接
+            if (eventSource) {
+                addMessage("Already connected to SSE", "error");
+                return;
+            }
+            
+            // 创建EventSource实例，连接服务端的SSE接口
+            eventSource = new EventSource('/sse/subscribe');
+            
+            // 连接成功建立时触发
+            eventSource.onopen = function(event) {
+                addMessage("Connection established", "complete");
+            };
+            
+            // 监听未指定事件名的消息（对应服务端未设置name的事件）
+            eventSource.onmessage = function(event) {
+                addMessage("Message: " + event.data, "message");
+            };
+            
+            // 监听服务端发送的"CONNECTED"事件（连接成功通知）
+            eventSource.addEventListener("CONNECTED", function(event) {
+                addMessage("Connected: " + event.data, "complete");
+            });
+            
+            // 监听服务端发送的"BROADCAST"事件（广播消息）
+            eventSource.addEventListener("BROADCAST", function(event) {
+                addMessage("Broadcast: " + event.data, "broadcast");
+            });
+            
+            // 监听服务端发送的"PROGRESS"事件（任务进度）
+            eventSource.addEventListener("PROGRESS", function(event) {
+                addMessage("Progress: " + event.data, "progress");
+            });
+            
+            // 监听服务端发送的"COMPLETE"事件（任务完成）
+            eventSource.addEventListener("COMPLETE", function(event) {
+                addMessage("Complete: " + event.data, "complete");
+            });
+            
+            // 连接出错时触发（如网络中断）
+            eventSource.onerror = function(event) {
+                addMessage("Error occurred", "error");
+                // 注意：SSE会自动重连，无需手动处理
+            };
+        }
+        
+        /**
+         * 断开SSE连接
+         */
+        function disconnectSSE() {
+            if (eventSource) {
+                eventSource.close(); // 关闭连接
+                eventSource = null;
+                addMessage("Disconnected from SSE", "complete");
+            } else {
+                addMessage("Not connected to SSE", "error");
+            }
+        }
+        
+        /**
+         * 发送广播消息（调用服务端的广播接口）
+         */
+        function broadcastMessage() {
+            const message = prompt("Enter message to broadcast:"); // 弹出输入框
+            if (message) {
+                // 调用后端广播接口
+                fetch('/sse/broadcast?message=' + encodeURIComponent(message))
+                    .then(response => response.text())
+                    .then(data => addMessage("Server: " + data, "message"))
+                    .catch(error => addMessage("Error: " + error, "error"));
+            }
+        }
+        
+        /**
+         * 启动模拟任务（调用服务端的任务接口）
+         */
+        function startTask() {
+            fetch('/sse/start-task')
+                .then(response => response.text())
+                .then(data => addMessage("Server: " + data, "message"))
+                .catch(error => addMessage("Error: " + error, "error"));
+        }
+        
+        /**
+         * 在页面上添加消息（辅助函数）
+         */
+        function addMessage(text, className) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + className; // 添加样式类
+            // 显示时间和消息内容
+            messageDiv.textContent = new Date().toLocaleTimeString() + ' - ' + text;
+            messagesDiv.appendChild(messageDiv);
+            // 自动滚动到最新消息
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>
+
