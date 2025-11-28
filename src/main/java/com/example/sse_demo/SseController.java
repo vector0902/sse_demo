@@ -33,7 +33,8 @@ public class SseController {
     public SseEmitter subscribe() {
         // 创建SseEmitter实例，设置超时时间为无限（默认30秒会超时，这里设为Long.MAX_VALUE避免自动断开）
         long timeout = Long.MAX_VALUE;
-        timeout=20; // test
+        // timeout=20; // test
+
         SseEmitter emitter = new SseEmitter(timeout);
 
         // 将新连接加入活跃列表（后续推送消息时会遍历这个列表）
